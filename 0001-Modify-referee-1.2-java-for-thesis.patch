@@ -1,0 +1,1046 @@
+From 4b21e183718711b3d3e895e8d7318efa7d4aa5e2 Mon Sep 17 00:00:00 2001
+Date: Fri, 16 Jun 2023 09:19:58 +0200
+Subject: [PATCH] Modify referee-1.2-java for thesis
+
+---
+ referee1.2-java/dependency-reduced-pom.xml    | 143 +++++------
+ referee1.2-java/pom.xml                       |   6 +-
+ .../main/java/com/codingame/game/Referee.java |   3 +-
+ .../com/codingame/game/engine/Constants.java  |  16 +-
+ .../com/codingame/game/engine/DraftPhase.java |  22 +-
+ .../codingame/game/engine/EngineReferee.java  |   7 +-
+ .../codingame/game/engine/RefereeParams.java  |  39 ++-
+ .../java/com/codingame/game/ui/RefereeUI.java |  10 +-
+ .../runner/CommandLineInterface.java          |  87 +++----
+ .../runner/PlayerRandomWItems2lanes.java      | 196 +++++++++++++++
+ referee1.2-java/src/test/java/Main.java       |   6 +-
+ .../test/java/PlayerRandomWItems2lanes.java   | 226 ------------------
+ 12 files changed, 386 insertions(+), 375 deletions(-)
+ create mode 100644 referee1.2-java/src/main/java/com/codingame/gameengine/runner/PlayerRandomWItems2lanes.java
+ delete mode 100644 referee1.2-java/src/test/java/PlayerRandomWItems2lanes.java
+
+diff --git a/referee1.2-java/dependency-reduced-pom.xml b/referee1.2-java/dependency-reduced-pom.xml
+index aa2fb78..c2ff046 100644
+--- a/referee1.2-java/dependency-reduced-pom.xml
++++ b/referee1.2-java/dependency-reduced-pom.xml
+@@ -1,71 +1,72 @@
+-<?xml version="1.0" encoding="UTF-8"?>
+-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+-  <modelVersion>4.0.0</modelVersion>
+-  <groupId>com.codingame.game</groupId>
+-  <artifactId>LegendsOfCodeAndMagic</artifactId>
+-  <version>1.2</version>
+-  <build>
+-    <plugins>
+-      <plugin>
+-        <artifactId>maven-compiler-plugin</artifactId>
+-        <version>3.3</version>
+-        <configuration>
+-          <source>1.8</source>
+-          <target>1.8</target>
+-        </configuration>
+-      </plugin>
+-      <plugin>
+-        <artifactId>maven-jar-plugin</artifactId>
+-        <version>2.6</version>
+-        <configuration>
+-          <archive>
+-            <manifest>
+-              <addClasspath>true</addClasspath>
+-              <mainClass>com.codingame.gameengine.runner.CommandLineInterface</mainClass>
+-            </manifest>
+-          </archive>
+-        </configuration>
+-      </plugin>
+-      <plugin>
+-        <artifactId>maven-shade-plugin</artifactId>
+-        <version>2.4.2</version>
+-        <executions>
+-          <execution>
+-            <phase>package</phase>
+-            <goals>
+-              <goal>shade</goal>
+-            </goals>
+-            <configuration>
+-              <transformers>
+-                <transformer>
+-                  <mainClass>com.codingame.gameengine.runner.CommandLineInterface</mainClass>
+-                </transformer>
+-              </transformers>
+-            </configuration>
+-          </execution>
+-        </executions>
+-      </plugin>
+-    </plugins>
+-  </build>
+-  <dependencies>
+-    <dependency>
+-      <groupId>junit</groupId>
+-      <artifactId>junit</artifactId>
+-      <version>4.12</version>
+-      <scope>test</scope>
+-      <exclusions>
+-        <exclusion>
+-          <artifactId>hamcrest-core</artifactId>
+-          <groupId>org.hamcrest</groupId>
+-        </exclusion>
+-      </exclusions>
+-    </dependency>
+-  </dependencies>
+-  <properties>
+-    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+-    <maven.compiler.source>1.8</maven.compiler.source>
+-    <gamengine.version>2.5</gamengine.version>
+-    <maven.compiler.target>1.8</maven.compiler.target>
+-  </properties>
+-</project>
+-
++<?xml version="1.0" encoding="UTF-8"?>
++<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
++  <modelVersion>4.0.0</modelVersion>
++  <groupId>com.codingame.game</groupId>
++  <artifactId>LegendsOfCodeAndMagic</artifactId>
++  <version>1.2</version>
++  <build>
++    <plugins>
++      <plugin>
++        <artifactId>maven-compiler-plugin</artifactId>
++        <version>3.3</version>
++        <configuration>
++          <source>1.8</source>
++          <target>1.8</target>
++        </configuration>
++      </plugin>
++      <plugin>
++        <artifactId>maven-jar-plugin</artifactId>
++        <version>2.6</version>
++        <configuration>
++          <archive>
++            <manifest>
++              <addClasspath>true</addClasspath>
++              <mainClass>com.codingame.gameengine.runner.CommandLineInterface</mainClass>
++            </manifest>
++          </archive>
++        </configuration>
++      </plugin>
++      <plugin>
++        <artifactId>maven-shade-plugin</artifactId>
++        <version>2.4.2</version>
++        <executions>
++          <execution>
++            <phase>package</phase>
++            <goals>
++              <goal>shade</goal>
++            </goals>
++            <configuration>
++              <transformers>
++                <transformer>
++                  <mainClass>com.codingame.gameengine.runner.CommandLineInterface</mainClass>
++                </transformer>
++              </transformers>
++            </configuration>
++          </execution>
++        </executions>
++      </plugin>
++    </plugins>
++  </build>
++  <dependencies>
++    <dependency>
++      <groupId>junit</groupId>
++      <artifactId>junit</artifactId>
++      <version>4.12</version>
++      <scope>test</scope>
++      <exclusions>
++        <exclusion>
++          <artifactId>hamcrest-core</artifactId>
++          <groupId>org.hamcrest</groupId>
++        </exclusion>
++      </exclusions>
++    </dependency>
++  </dependencies>
++  <properties>
++    <maven.compiler.target>1.8</maven.compiler.target>
++    <maven.compiler.source>1.8</maven.compiler.source>
++    <gamengine.version>4.4.0</gamengine.version>
++    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
++    <native.maven.plugin.version>0.9.19</native.maven.plugin.version>
++  </properties>
++</project>
++
+diff --git a/referee1.2-java/pom.xml b/referee1.2-java/pom.xml
+index eef2fc4..dc43cad 100644
+--- a/referee1.2-java/pom.xml
++++ b/referee1.2-java/pom.xml
+@@ -7,10 +7,11 @@
+ 	<version>1.2</version>
+ 
+ 	<properties>
+-        <gamengine.version>2.5</gamengine.version>
++        <gamengine.version>4.4.0</gamengine.version>
+         <maven.compiler.source>1.8</maven.compiler.source>
+         <maven.compiler.target>1.8</maven.compiler.target>
+ 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
++		<native.maven.plugin.version>0.9.19</native.maven.plugin.version>
+ 	</properties>
+ 
+ 	<dependencies>
+@@ -35,7 +36,7 @@
+ 		<dependency>
+ 			<groupId>commons-cli</groupId>
+ 			<artifactId>commons-cli</artifactId>
+-			<version>1.3.1</version>
++			<version>1.5.0</version>
+ 		</dependency>
+ 
+ 		<dependency>
+@@ -98,5 +99,4 @@
+ 
+ 		</plugins>
+ 	</build>
+-
+ </project>
+diff --git a/referee1.2-java/src/main/java/com/codingame/game/Referee.java b/referee1.2-java/src/main/java/com/codingame/game/Referee.java
+index dd56440..d82ce41 100644
+--- a/referee1.2-java/src/main/java/com/codingame/game/Referee.java
++++ b/referee1.2-java/src/main/java/com/codingame/game/Referee.java
+@@ -16,7 +16,7 @@ public class Referee extends AbstractReferee {
+     @Inject private EndScreenModule endScreenModule;
+     @Inject private FXModule fxModule;
+ 
+-    private EngineReferee engine = new EngineReferee();
++    public EngineReferee engine = new EngineReferee();
+     private RefereeUI ui;
+ 
+     //public static int turn = 0;
+@@ -50,6 +50,7 @@ public class Referee extends AbstractReferee {
+     @Override
+     public void onEnd() {
+         if (Constants.HANDLE_UI)
++            // engine.state.players[0].health
+             endScreenModule.setScores(gameManager.getPlayers().stream().mapToInt(p -> p.getScore()).toArray());
+     }
+ }
+diff --git a/referee1.2-java/src/main/java/com/codingame/game/engine/Constants.java b/referee1.2-java/src/main/java/com/codingame/game/engine/Constants.java
+index a31f486..1536040 100644
+--- a/referee1.2-java/src/main/java/com/codingame/game/engine/Constants.java
++++ b/referee1.2-java/src/main/java/com/codingame/game/engine/Constants.java
+@@ -1,12 +1,6 @@
+ package com.codingame.game.engine;
+ 
+-import java.io.BufferedReader;
+-import java.io.BufferedWriter;
+-import java.io.FileOutputStream;
+-import java.io.IOException;
+-import java.io.InputStreamReader;
+-import java.io.OutputStreamWriter;
+-import java.io.Writer;
++import java.io.*;
+ import java.nio.file.Files;
+ import java.nio.file.Paths;
+ import java.util.HashMap;
+@@ -38,10 +32,10 @@ public final class Constants
+ 
+   public static final int MAX_CREATURES_IN_LINE = 6; // was 8
+ 
+-  public static final int TIMELIMIT_FIRSTDRAFTTURN = 1000;
++  public static final int TIMELIMIT_FIRSTDRAFTTURN = 100;
+   public static final int TIMELIMIT_DRAFTTURN = 100;
+-  public static final int TIMELIMIT_FIRSTGAMETURN = 1000;
+-  public static int TIMELIMIT_GAMETURN = LANES==1 ?  100 : 200;
++  public static final int TIMELIMIT_FIRSTGAMETURN = 400;
++  public static int TIMELIMIT_GAMETURN = 400;
+ 
+   public static final int PLAYER_TURNLIMIT = 50;
+   public static final int MAX_TURNS_HARDLIMIT = (2*CARDS_IN_DECK + 2*CARDS_IN_DECK + 2*10) * 10;
+@@ -59,7 +53,7 @@ public final class Constants
+     BufferedReader bufferedReader = null;
+     try
+     {
+-      bufferedReader = new BufferedReader(new InputStreamReader(ClassLoader.getSystemResourceAsStream(cardsetPath), "UTF-8"));
++      bufferedReader = new BufferedReader(new FileReader(cardsetPath));
+     }
+     catch (Exception e)
+     {
+diff --git a/referee1.2-java/src/main/java/com/codingame/game/engine/DraftPhase.java b/referee1.2-java/src/main/java/com/codingame/game/engine/DraftPhase.java
+index 3d1cf2d..2fdfcf6 100644
+--- a/referee1.2-java/src/main/java/com/codingame/game/engine/DraftPhase.java
++++ b/referee1.2-java/src/main/java/com/codingame/game/engine/DraftPhase.java
+@@ -26,7 +26,7 @@ public class DraftPhase
+ 
+   private Random choicesRNG;
+   private Random[] shufflesRNG;
+-  private RefereeParams params;
++  public RefereeParams params;
+ 
+   public int[] showdraftQuantities;
+   public ArrayList<Card> showdraftCards;
+@@ -137,6 +137,16 @@ public class DraftPhase
+       draft[pick][0] = allowedCards.get(choice1);
+       draft[pick][1] = allowedCards.get(choice2);
+       draft[pick][2] = allowedCards.get(choice3);
++
++      if (params.deckPlayer0Ids != null) {
++        draft[pick][0] = Constants.CARDSET.get(params.deckPlayer0Ids[pick]);
++      }
++      if (params.deckPlayer1Ids != null) {
++        draft[pick][1] = Constants.CARDSET.get(params.deckPlayer1Ids[pick]);
++      }
++      if (params.deckPlayer0Ids != null && params.deckPlayer1Ids != null) {
++        draft[pick][2] = Constants.CARDSET.get(1);
++      }
+     }
+ 
+     prepareShowdraft();
+@@ -144,7 +154,7 @@ public class DraftPhase
+ 
+   private void prepareShowdraft()
+   {
+-    showdraftQuantities = new int[161];
++    showdraftQuantities = new int[Constants.CARDSET.size() + 1];
+     for (int choice = 0; choice < 90; choice++)
+       showdraftQuantities[draft[choice/3][choice%3].baseId]++;
+ 
+@@ -204,6 +214,14 @@ public class DraftPhase
+       throw new InvalidActionHard("Invalid action. Expected  \"PICK [0,1,2]\" or \"PASS\".");
+     }
+ 
++    // override choice
++    if (player == 0 && params.deckPlayer0Ids != null) {
++      choice = Constants.CARDSET.get(params.deckPlayer0Ids[pickNumber]);
++    }
++    if (player == 1 && params.deckPlayer1Ids != null) {
++      choice = Constants.CARDSET.get(params.deckPlayer1Ids[pickNumber]);
++    }
++
+     chosenCards[player].add(choice);
+     return new ChoiceResultPair(choice, text);
+   }
+diff --git a/referee1.2-java/src/main/java/com/codingame/game/engine/EngineReferee.java b/referee1.2-java/src/main/java/com/codingame/game/engine/EngineReferee.java
+index 95972de..62f52c3 100644
+--- a/referee1.2-java/src/main/java/com/codingame/game/engine/EngineReferee.java
++++ b/referee1.2-java/src/main/java/com/codingame/game/engine/EngineReferee.java
+@@ -54,7 +54,7 @@ public class EngineReferee {
+             difficulty = DraftPhase.Difficulty.NORMAL;
+         }
+ 
+-        Constants.LoadCardlist("cardlist.txt");
++        Constants.LoadCardlist(params.cardlistPath);
+         if (Constants.VERBOSE_LEVEL > 1) System.out.println("   CARDSET with " + Constants.CARDSET.size() + " cards loaded.");
+         if (Constants.VERBOSE_LEVEL > 1) System.out.println("   Difficulty is set to: " + difficulty.name() + ".");
+ 
+@@ -260,7 +260,7 @@ public class EngineReferee {
+     private void HandleError(MultiplayerGameManager<Player> gameManager, Player sdkplayer, String errmsg) {
+         gameManager.addToGameSummary(MultiplayerGameManager.formatErrorMessage(errmsg));
+         sdkplayer.deactivate(errmsg);
+-        sdkplayer.setScore(-1);
++        sdkplayer.setScore(-999);
+         gameManager.endGame();
+     }
+ 
+@@ -276,7 +276,8 @@ public class EngineReferee {
+         if (Constants.VERBOSE_LEVEL > 0) System.out.println((state.winner == 0 ? "1" : "0") + " " + (state.winner == 1 ? "1" : "0"));
+ 
+         gameManager.addToGameSummary(MultiplayerGameManager.formatSuccessMessage(gameManager.getPlayer(state.winner).getNicknameToken() + " won!"));
+-        gameManager.getPlayer(state.winner).setScore(1);
++        gameManager.getPlayer(0).setScore(state.players[0].health);
++        gameManager.getPlayer(1).setScore(state.players[1].health);
+         gameManager.endGame();
+         return true;
+     }
+diff --git a/referee1.2-java/src/main/java/com/codingame/game/engine/RefereeParams.java b/referee1.2-java/src/main/java/com/codingame/game/engine/RefereeParams.java
+index 953b5ce..e7209e5 100644
+--- a/referee1.2-java/src/main/java/com/codingame/game/engine/RefereeParams.java
++++ b/referee1.2-java/src/main/java/com/codingame/game/engine/RefereeParams.java
+@@ -12,14 +12,10 @@ public class RefereeParams
+   public Random shufflePlayer0RNG;
+   public Random shufflePlayer1RNG;
+   public Integer[][] predefinedDraftIds = null;
++  public Integer[] deckPlayer0Ids;
++  public Integer[] deckPlayer1Ids;
+   private Properties params;
+-
+-  public RefereeParams(long draftChoicesSeed, long shufflePlayer0Seed, long shufflePlayer1Seed)
+-  {
+-    draftChoicesRNG = new Random(draftChoicesSeed);
+-    shufflePlayer0RNG = new Random(shufflePlayer0Seed);
+-    shufflePlayer1RNG = new Random(shufflePlayer1Seed);
+-  }
++  public String cardlistPath;
+ 
+   public RefereeParams(MultiplayerGameManager<Player> gameManager)
+   {
+@@ -66,6 +62,30 @@ public class RefereeParams
+       }
+     }
+ 
++    if (params.getProperty("deckPlayer0Ids") != null) {
++      deckPlayer0Ids = new Integer[Constants.CARDS_IN_DECK];
++      String[] picks = params.getProperty("deckPlayer0Ids").split(",");
++
++      assert (picks.length == Constants.CARDS_IN_DECK);
++
++      for (int pick=0; pick < Constants.CARDS_IN_DECK; pick++) {
++        String choice = picks[pick].trim();
++        deckPlayer0Ids[pick] = Integer.parseInt(choice);
++      }
++    }
++
++    if (params.getProperty("deckPlayer1Ids") != null) {
++      deckPlayer1Ids = new Integer[Constants.CARDS_IN_DECK];
++      String[] picks = params.getProperty("deckPlayer1Ids").split(",");
++
++      assert (picks.length == Constants.CARDS_IN_DECK);
++
++      for (int pick=0; pick < Constants.CARDS_IN_DECK; pick++) {
++        String choice = picks[pick].trim();
++        deckPlayer1Ids[pick] = Integer.parseInt(choice);
++      }
++    }
++
+     // update params values
+     // we can't update predefinedDraftIds if there were not set by the user...
+     params.setProperty("draftChoicesSeed",  Long.toString(draftChoicesSeed));
+@@ -77,6 +97,8 @@ public class RefereeParams
+     shufflePlayer0RNG = new Random(shufflePlayer0Seed);
+     shufflePlayer1RNG = new Random(shufflePlayer1Seed);
+ 
++    cardlistPath = params.getProperty("cardlistPath", "cardlist.txt");
++
+     //System.out.println(toString());
+   }
+ 
+@@ -87,6 +109,9 @@ public class RefereeParams
+     sb.append("draftChoicesSeed").append("=").append(params.getProperty("draftChoicesSeed")).append("\n");
+     sb.append("shufflePlayer0Seed").append("=").append(params.getProperty("shufflePlayer0Seed")).append("\n");
+     sb.append("shufflePlayer1Seed").append("=").append(params.getProperty("shufflePlayer1Seed")).append("\n");
++    sb.append("deckPlayer0Ids").append("=").append(params.getProperty("deckPlayer0Ids")).append("\n");
++    sb.append("deckPlayer1Ids").append("=").append(params.getProperty("deckPlayer1Ids")).append("\n");
++    sb.append("cardlistPath").append("=").append(params.getProperty("cardlistPath")).append("\n");
+     //sb.append("predefinedDraftIds").append("=").append(params.getProperty("predefinedDraftIds")).append("\n");
+     return sb.toString();
+   }
+diff --git a/referee1.2-java/src/main/java/com/codingame/game/ui/RefereeUI.java b/referee1.2-java/src/main/java/com/codingame/game/ui/RefereeUI.java
+index 1a58e76..7ac546c 100644
+--- a/referee1.2-java/src/main/java/com/codingame/game/ui/RefereeUI.java
++++ b/referee1.2-java/src/main/java/com/codingame/game/ui/RefereeUI.java
+@@ -16,10 +16,7 @@ import com.codingame.game.engine.CreatureOnBoard;
+ import com.codingame.game.engine.EngineReferee;
+ import com.codingame.game.engine.Gamer;
+ import com.codingame.gameengine.core.MultiplayerGameManager;
+-import com.codingame.gameengine.module.entities.GraphicEntityModule;
+-import com.codingame.gameengine.module.entities.Rectangle;
+-import com.codingame.gameengine.module.entities.Sprite;
+-import com.codingame.gameengine.module.entities.Text;
++import com.codingame.gameengine.module.entities.*;
+ import com.codingame.view.FXModule;
+ import com.codingame.view.tooltip.TooltipModule;
+ 
+@@ -60,7 +57,7 @@ public class RefereeUI {
+         tooltipModule = new TooltipModule(gameManager);
+         gameManager.setFrameDuration(Constants.FRAME_DURATION_SHOWDRAFT);
+ 
+-        graphicEntityModule.createSpriteSheetLoader()
++        graphicEntityModule.createSpriteSheetSplitter()
+             .setName("atlas-")
+             .setSourceImage("atlas.png")
+             .setWidth(600 / 4)
+@@ -68,8 +65,7 @@ public class RefereeUI {
+             .setOrigRow(0)
+             .setOrigCol(0)
+             .setImageCount(160)
+-            .setImagesPerRow(10)
+-            .load();
++            .setImagesPerRow(10);
+ 
+         graphicEntityModule.createSprite()
+             .setAnchor(0)
+diff --git a/referee1.2-java/src/main/java/com/codingame/gameengine/runner/CommandLineInterface.java b/referee1.2-java/src/main/java/com/codingame/gameengine/runner/CommandLineInterface.java
+index dd1cb58..39aea33 100644
+--- a/referee1.2-java/src/main/java/com/codingame/gameengine/runner/CommandLineInterface.java
++++ b/referee1.2-java/src/main/java/com/codingame/gameengine/runner/CommandLineInterface.java
+@@ -1,21 +1,19 @@
+ package com.codingame.gameengine.runner;
+ 
+-import java.io.StringReader;
+-import java.lang.reflect.Field;
+-import java.nio.charset.Charset;
+-import java.nio.file.Paths;
+-import java.util.List;
+-import java.util.Properties;
+-
++import com.codingame.game.engine.Constants;
++import com.codingame.gameengine.runner.simulate.GameResult;
++import com.google.common.io.FileWriteMode;
++import com.google.common.io.Files;
++import com.google.gson.Gson;
+ import org.apache.commons.cli.CommandLine;
+ import org.apache.commons.cli.DefaultParser;
+ import org.apache.commons.cli.HelpFormatter;
+ import org.apache.commons.cli.Options;
+ 
+-import com.codingame.game.engine.Constants;
+-import com.codingame.gameengine.runner.dto.GameResult;
+-import com.google.common.io.Files;
+-import com.google.gson.Gson;
++import java.io.StringReader;
++import java.nio.charset.Charset;
++import java.nio.file.Paths;
++import java.util.Properties;
+ 
+ public class CommandLineInterface {
+   public static void main(String[] args) {
+@@ -25,12 +23,13 @@ public class CommandLineInterface {
+         .addOption("d", true, "Referee initial data")
+         .addOption("h", false, "Print the help")
+         .addOption("l", true, "File output for logs")
+-        .addOption("p1", true, "Required. Player 1 command line.")
+-        .addOption("p2", true, "Required. Player 2 command line.")
++        .addOption("v", false, "Enable verbose logs")
++        .addOption("p1", true, "Player 1 command line.")
++        .addOption("p2", true, "Player 2 command line.")
+         .addOption("s", false, "Server mode");
+ 
+       CommandLine cmd = new DefaultParser().parse(options, args);
+-      if (cmd.hasOption("h") || !cmd.hasOption("p1") || !cmd.hasOption("p2")) {
++      if (cmd.hasOption("h")) {
+         new HelpFormatter().printHelp(
+           "-p1 <player1 command line> -p2 <player2 command line> [-s -l <File output for logs>]",
+           options
+@@ -46,40 +45,48 @@ public class CommandLineInterface {
+         runner.setGameParameters(properties);
+       }
+ 
+-      runner.addAgent(cmd.getOptionValue("p1"));
+-      runner.addAgent(cmd.getOptionValue("p2"));
++      if (cmd.hasOption("p1")) {
++        runner.addAgent(cmd.getOptionValue("p1"));
++      } else {
++        runner.addAgent(PlayerRandomWItems2lanes.class);
++      }
+ 
+-      try {
+-        if (cmd.hasOption("s")) {
+-          runner.start();
+-        } else {
+-          Constants.HANDLE_UI = false;
++      if (cmd.hasOption("p2")) {
++        runner.addAgent(cmd.getOptionValue("p2"));
++      } else {
++        runner.addAgent(PlayerRandomWItems2lanes.class);
++      }
+ 
+-          GameResult gameResult = runner.simulate();
++      if (cmd.hasOption("s")) {
++        runner.start();
++      } else {
++        Constants.HANDLE_UI = false;
+ 
+-          if (cmd.hasOption("l")) {
+-            Files.asCharSink(Paths.get(cmd.getOptionValue("l")).toFile(), Charset.defaultCharset())
+-              .write((String) new Gson().toJson(gameResult));
+-          }
++        GameResult gameResult = runner.simulate();
+ 
+-          System.out.println(gameResult.scores.get(0));
+-          System.out.println(gameResult.scores.get(1));
+-
+-          for (String line : gameResult.uinput) {
+-            System.out.println(line);
++        if (cmd.hasOption("l")) {
++          if (!cmd.hasOption("v")) {
++            gameResult.errors.values().forEach(v -> {
++              while (v.remove(null)) ;
++              while (v.remove("")) ;
++            });
++            gameResult.outputs = null;
++            gameResult.summaries = null;
++            gameResult.views = null;
++            gameResult.metadata = null;
++            gameResult.tooltips = null;
++            gameResult.agents = null;
+           }
++
++          Files.asCharSink(Paths.get(cmd.getOptionValue("l")).toFile(), Charset.defaultCharset(), FileWriteMode.APPEND)
++                  .write(new Gson().toJson(gameResult) + "\n");
+         }
+-      } finally {
+-        Field getPlayers = GameRunner.class.getDeclaredField("players");
+-        Field getProcess = CommandLinePlayerAgent.class.getDeclaredField("process");
+ 
+-        getPlayers.setAccessible(true);
+-        getProcess.setAccessible(true);
++        System.out.println(gameResult.scores.get(0));
++        System.out.println(gameResult.scores.get(1));
+ 
+-        List<Agent> players = (List<Agent>) getPlayers.get(runner);
+-        for (Agent player : players) {
+-          Process process = (Process) getProcess.get(player);
+-          process.destroy();
++        for (String parameter : gameResult.gameParameters) {
++          System.out.println(parameter);
+         }
+       }
+     } catch (Exception e) {
+diff --git a/referee1.2-java/src/main/java/com/codingame/gameengine/runner/PlayerRandomWItems2lanes.java b/referee1.2-java/src/main/java/com/codingame/gameengine/runner/PlayerRandomWItems2lanes.java
+new file mode 100644
+index 0000000..b6c50e6
+--- /dev/null
++++ b/referee1.2-java/src/main/java/com/codingame/gameengine/runner/PlayerRandomWItems2lanes.java
+@@ -0,0 +1,196 @@
++package com.codingame.gameengine.runner;
++
++import java.util.*;
++
++public class PlayerRandomWItems2lanes
++{
++  public static class SimplifiedState
++  {
++    public HashMap<Integer, Integer> IdToCostMap = new HashMap<>();
++    public ArrayList<Integer> HandCreaturesIds = new ArrayList<>();
++    public ArrayList<Integer> ChargeIds = new ArrayList<>();
++    public ArrayList<Integer> GuardIds = new ArrayList<>();
++    public ArrayList<Integer> HandGreenItemsIds = new ArrayList<>();
++    public ArrayList<Integer> HandRedItemsIds = new ArrayList<>();
++    public ArrayList<Integer> HandBlueItemsIds = new ArrayList<>();
++    public ArrayList<Integer> CanAttackIds = new ArrayList<>();
++    public ArrayList<Integer> FriendlyIds = new ArrayList<>();
++    public ArrayList<Integer> TargetCreaturesIds = new ArrayList<>();
++
++    public int Mana;
++
++    public SimplifiedState(Scanner scanner) // Warning: System.err.println from the class goes to Main error channel, and are not cached by the codingame
++    {
++      int playerHealth = scanner.nextInt();
++      Mana = scanner.nextInt();
++      int playerDeck = scanner.nextInt();
++      int playerRune = scanner.nextInt();
++      int playerDraw = scanner.nextInt();
++      int oppHealth = scanner.nextInt();
++      int oppMana = scanner.nextInt();
++      int oppDeck = scanner.nextInt();
++      int oppRune = scanner.nextInt();
++      int oppDraw = scanner.nextInt();
++      int opponentHand = scanner.nextInt();
++      int opponentActions = scanner.nextInt();
++      if (scanner.hasNextLine()) { scanner.nextLine(); }
++      for (int i = 0; i < opponentActions; i++) {
++        scanner.nextLine();
++      }
++      int cardCount = scanner.nextInt();
++      for (int i = 0; i < cardCount; i++) {
++        int cardName = scanner.nextInt();
++        int instanceId = scanner.nextInt();
++        int location = scanner.nextInt();
++        int type = scanner.nextInt();
++        int cost = scanner.nextInt();
++        int attack = scanner.nextInt();
++        int defense = scanner.nextInt();
++        String abilities = scanner.next();
++        int myHealthChange = scanner.nextInt();
++        int opponentHealthChange = scanner.nextInt();
++        int cardDraw = scanner.nextInt();
++        int lane = scanner.nextInt();
++
++        if (abilities.contains("C")) {
++          ChargeIds.add(instanceId);
++        }
++        if (abilities.contains("G")) {
++          GuardIds.add(instanceId);
++        }
++
++        if (location==0) // hand
++        {
++          IdToCostMap.put(instanceId, cost);
++          if (type==0) // card is creature
++          {
++            HandCreaturesIds.add(instanceId);
++          }
++          else if (type==1) // card is a green item
++          {
++            HandGreenItemsIds.add(instanceId);
++          }
++          else if (type==2) // card is a red item
++          {
++            HandRedItemsIds.add(instanceId);
++          }
++          else if (type==3) // card is a blue item
++          {
++            HandBlueItemsIds.add(instanceId);
++          }
++        }
++        if (location==1) // board
++        {
++          FriendlyIds.add(instanceId);
++          CanAttackIds.add(instanceId);
++        }
++        if (location==-1) // opponent board
++        {
++          TargetCreaturesIds.add(instanceId);
++        }
++      }
++    }
++  }
++
++  public static void main(String[] args)
++  {
++    Random random = new Random();
++    Scanner scanner = new Scanner(System.in);
++
++    for (int i=0; i < 30; i++)
++    {
++      new SimplifiedState(scanner);
++      System.out.printf("PICK %d %s%n", 1, "");
++    }
++
++    while (true)
++    {
++      SimplifiedState state = new SimplifiedState(scanner);
++      StringBuilder sb = new StringBuilder();
++      sb.append("; ");
++
++      boolean run = true;
++      while (run) {
++        run = false;
++
++        // summon phase
++        state.HandCreaturesIds.removeIf(c -> state.IdToCostMap.get(c) > state.Mana);
++        if (!state.HandCreaturesIds.isEmpty()) {
++          run = true;
++          Integer id = state.HandCreaturesIds.get(random.nextInt(state.HandCreaturesIds.size()));
++          state.HandCreaturesIds.remove(id);
++          state.FriendlyIds.add(id);
++          state.Mana -= state.IdToCostMap.get(id);
++          sb.append(String.format("SUMMON %d %d; ", id, random.nextInt(2)));
++          if (state.ChargeIds.contains(id)) {
++            state.CanAttackIds.add(id);
++          }
++        }
++
++        // green items phase
++        state.HandGreenItemsIds.removeIf(c -> state.IdToCostMap.get(c) > state.Mana);
++        if (!state.HandGreenItemsIds.isEmpty() && !state.FriendlyIds.isEmpty()) {
++          run = true;
++          Integer id = state.HandGreenItemsIds.get(random.nextInt(state.HandGreenItemsIds.size()));
++          state.HandGreenItemsIds.remove(id);
++          state.Mana -= state.IdToCostMap.get(id);
++          Integer idt = state.FriendlyIds.get(random.nextInt(state.FriendlyIds.size()));
++          sb.append(String.format("USE %d %d; ", id, idt));
++          if (state.ChargeIds.contains(id) && !state.ChargeIds.contains(idt)) {
++            state.CanAttackIds.add(idt);
++            state.ChargeIds.add(idt);
++          }
++        }
++
++        // red/blue items phase
++        state.HandRedItemsIds.removeIf(c -> state.IdToCostMap.get(c) > state.Mana);
++        if (state.TargetCreaturesIds.size()==0) {
++          state.HandRedItemsIds.clear();
++        }
++        if (!state.HandRedItemsIds.isEmpty()) {
++          run = true;
++          Integer id = state.HandRedItemsIds.get(random.nextInt(state.HandRedItemsIds.size()));
++          state.HandRedItemsIds.remove(id);
++          state.Mana -= state.IdToCostMap.get(id);
++          Integer idt = state.TargetCreaturesIds.get(random.nextInt(state.TargetCreaturesIds.size()));
++          sb.append(String.format("USE %d %d use; ", id, idt));
++          if (state.GuardIds.contains(id)) {
++            state.GuardIds.remove(idt);
++          }
++        }
++
++        state.HandBlueItemsIds.removeIf(c -> state.IdToCostMap.get(c) > state.Mana);
++        if (!state.HandBlueItemsIds.isEmpty()) {
++          run = true;
++          Integer id = state.HandBlueItemsIds.get(random.nextInt(state.HandBlueItemsIds.size()));
++          state.HandBlueItemsIds.remove(id);
++          state.Mana -= state.IdToCostMap.get(id);
++          int idt = -1;
++          if (random.nextInt(2) < 1 && state.TargetCreaturesIds.size()>0) {
++            // 50% to creature target
++            idt = state.TargetCreaturesIds.get(random.nextInt(state.TargetCreaturesIds.size()));
++          }
++          sb.append(String.format("USE %d %d; ", id, idt));
++        }
++      }
++
++      // attack phase
++      Collections.shuffle(state.CanAttackIds);
++      Collections.shuffle(state.TargetCreaturesIds);
++      List<Integer> guardTargets = state.TargetCreaturesIds.stream().filter(t -> state.GuardIds.contains(t)).toList();
++      List<Integer> nonGuardTargets = state.TargetCreaturesIds.stream().filter(t -> !state.GuardIds.contains(t)).toList();
++
++      for (Integer ida : state.CanAttackIds) {
++        for (Integer idt : guardTargets) {
++          sb.append(String.format("ATTACK %d %d; ", ida, idt));
++        }
++        for (Integer idt : nonGuardTargets) {
++          sb.append(String.format("ATTACK %d %d; ", ida, idt));
++        }
++        sb.append(String.format("ATTACK %d %d; ", ida, -1));
++      }
++
++      System.out.println(sb);
++    }
++  }
++}
+\ No newline at end of file
+diff --git a/referee1.2-java/src/test/java/Main.java b/referee1.2-java/src/test/java/Main.java
+index 1a1631e..8994ec0 100644
+--- a/referee1.2-java/src/test/java/Main.java
++++ b/referee1.2-java/src/test/java/Main.java
+@@ -1,8 +1,8 @@
+ //import com.codingame.gameengine.runner.Constants;
+ import com.codingame.game.engine.Constants;
+-import com.codingame.gameengine.runner.dto.GameResult;
+ import com.codingame.gameengine.runner.MultiplayerGameRunner;
+-import org.omg.Dynamic.Parameter;
++import com.codingame.gameengine.runner.PlayerRandomWItems2lanes;
++import com.codingame.gameengine.runner.simulate.GameResult;
+ 
+ import java.util.Properties;
+ 
+@@ -27,8 +27,6 @@ public class Main
+         Constants.LANES = 2;
+         if (Constants.LANES > 1)
+           runner(PlayerRandomWItems2lanes.class, PlayerRandomWItems2lanes.class).start();
+-        else
+-          runner(PlayerRandomWItems.class, PlayerRandomWItems.class).start();
+ 
+ 
+         // fight(PlayerRandom.class, PlayerAggroStupid.class, 10);
+diff --git a/referee1.2-java/src/test/java/PlayerRandomWItems2lanes.java b/referee1.2-java/src/test/java/PlayerRandomWItems2lanes.java
+deleted file mode 100644
+index db0f6f9..0000000
+--- a/referee1.2-java/src/test/java/PlayerRandomWItems2lanes.java
++++ /dev/null
+@@ -1,226 +0,0 @@
+-import java.util.*;
+-
+-/**
+- * AI description
+- * Draft phase:
+- *  - pick random card
+- * Game phase:
+- *  - while there are onboard friendly creatures and inhand green items with cost less then current mana
+- *       use random green item to a random friendly creature
+- *  - each creature attacks one randomly chosen available target
+- *  - if there are guards - target is chosen among them, otherwise it is any opponent creature or -1
+- *  - while there are inhand creatures with cost less then current mana summons random such creature
+- *  - while there are inhand red/blue items with cost less then current mana choose randomly one of them
+- *       you can choose red item only if there are enemy creatures onboard - then use it on a random such creature
+- *       for blue items there is 50% probability you hit face, otherwise like red items
+- */
+-public class PlayerRandomWItems2lanes
+-{
+-  private static class SimplifiedState
+-  {
+-    public HashMap<Integer, Integer> IdToCostMap = new HashMap<>();
+-    public ArrayList<Integer> HandCreaturesIds = new ArrayList<>();
+-    public ArrayList<Integer> HandGreenItemsIds = new ArrayList<>();
+-    public ArrayList<Integer> HandRedItemsIds = new ArrayList<>();
+-    public ArrayList<Integer> HandBlueItemsIds = new ArrayList<>();
+-    public ArrayList<Integer> CanAttackIds = new ArrayList<>();
+-    public ArrayList<Integer> GuardTargetIds = new ArrayList<>();
+-    public ArrayList<Integer> NonGuardTargetIds = new ArrayList<>();
+-    public ArrayList<Integer> FriendlyIds = new ArrayList<>();
+-    public ArrayList<Integer> TargetCreaturesIds = new ArrayList<>();
+-    public HashMap<Integer, Integer> AnyCreatureToLane = new HashMap<>();
+-
+-    public int Mana;
+-
+-    SimplifiedState(Scanner scanner) // Warning: System.err.println from the class goes to Main error channel, and are not cached by the codingame
+-    {
+-      NonGuardTargetIds.add(-1);
+-
+-      int playerHealth = scanner.nextInt();
+-      Mana = scanner.nextInt();
+-      int playerDeck = scanner.nextInt();
+-      int playerRune = scanner.nextInt();
+-      int playerDraw = scanner.nextInt();
+-      int oppHealth = scanner.nextInt();
+-      int oppMana = scanner.nextInt();
+-      int oppDeck = scanner.nextInt();
+-      int oppRune = scanner.nextInt();
+-      int oppDraw = scanner.nextInt();
+-      //System.err.format("my deck: %d, opp deck: %d\n", playerDeck, oppDeck);
+-      //System.err.format("my draw: %d, opp draw: %d\n", playerDraw, oppDraw);
+-      int opponentHand = scanner.nextInt();
+-      int opponentActions = scanner.nextInt();
+-      //System.err.format("oppA - " + opponentActions + "\n");
+-      if (scanner.hasNextLine()) { scanner.nextLine(); }
+-      for (int i = 0; i < opponentActions; i++)
+-      {
+-        String cardNumberAndAction = scanner.nextLine();
+-        //System.err.format("OPPACTION: %s\n", cardNumberAndAction);
+-      }
+-      int cardCount = scanner.nextInt();
+-      for (int i = 0; i < cardCount; i++) {
+-        int cardName = scanner.nextInt();
+-        int instanceId = scanner.nextInt();
+-        int location = scanner.nextInt();
+-        int type = scanner.nextInt();
+-        int cost = scanner.nextInt();
+-        int attack = scanner.nextInt();
+-        int defense = scanner.nextInt();
+-        String abilities = scanner.next();
+-        int myHealthChange = scanner.nextInt();
+-        int opponentHealthChange = scanner.nextInt();
+-        int cardDraw = scanner.nextInt();
+-        int lane = scanner.nextInt();
+-        //System.err.format("CARD %d (#%d) // lane=%d\n", instanceId, cardName, lane);
+-
+-        if (location==0) // hand
+-        {
+-          IdToCostMap.put(instanceId, cost);
+-          if (type==0) // card is creature
+-          {
+-            HandCreaturesIds.add(instanceId);
+-          }
+-          else if (type==1) // card is a green item
+-          {
+-            HandGreenItemsIds.add(instanceId);
+-          }
+-          else if (type==2) // card is a red item
+-          {
+-            HandRedItemsIds.add(instanceId);
+-          }
+-          else if (type==3) // card is a blue item
+-          {
+-            HandBlueItemsIds.add(instanceId);
+-          }
+-        }
+-        if (location==1) // board
+-        {
+-          AnyCreatureToLane.put(instanceId, lane);
+-          FriendlyIds.add(instanceId);
+-          CanAttackIds.add(instanceId);
+-        }
+-        if (location==-1) // opponent board
+-        {
+-          AnyCreatureToLane.put(instanceId, lane);
+-          TargetCreaturesIds.add(instanceId);
+-          if (abilities.charAt(3)=='G')
+-          {
+-            GuardTargetIds.add(instanceId);
+-          }
+-          else
+-          {
+-            NonGuardTargetIds.add(instanceId);
+-          }
+-        }
+-      }
+-    }
+-  }
+-
+-  public static void main(String[] args)
+-  {
+-    Random random = new Random();
+-    Scanner scanner = new Scanner(System.in);
+-
+-    for (int i=0; i < 30; i++)
+-    {
+-      SimplifiedState state = new SimplifiedState(scanner);
+-      //for (int j=0; j < 3; j++)
+-      //{
+-      //  String card = scanner.nextLine();
+-      //}
+-
+-      int choice = random.nextInt(3);
+-      String text = "";// "I choose you ";
+-
+-      System.out.println(String.format("PICK %d %s", choice, text));
+-    }
+-
+-    while (true)
+-    {
+-      SimplifiedState state = new SimplifiedState(scanner);
+-      StringBuilder sb = new StringBuilder();
+-      sb.append("; ");
+-      boolean fullbonus = state.Mana==13;
+-
+-      // green items phase
+-      while (true)
+-      {
+-        state.HandGreenItemsIds.removeIf(c -> state.IdToCostMap.get(c) > state.Mana);
+-        System.err.println(String.format("GreenItems phase: %d items can be used on %d creatures.", state.HandGreenItemsIds.size(), state.FriendlyIds.size()));
+-        if (state.HandGreenItemsIds.isEmpty() || state.FriendlyIds.isEmpty())
+-          break;
+-
+-        Integer id = state.HandGreenItemsIds.get(random.nextInt(state.HandGreenItemsIds.size()));
+-        state.HandGreenItemsIds.remove(id);
+-        state.Mana -= state.IdToCostMap.get(id);
+-        int idt = state.FriendlyIds.get(random.nextInt(state.FriendlyIds.size()));
+-        sb.append(String.format("USE %d %d; ", id, idt));
+-      }
+-
+-      // attack phase
+-      List<Integer> targets = state.GuardTargetIds.isEmpty() ? state.NonGuardTargetIds : state.GuardTargetIds;
+-      System.err.println(String.format("Attack phase: %d creatures can attack %d targets.", state.CanAttackIds.size(), targets.size()));
+-      while (!state.CanAttackIds.isEmpty())
+-      {
+-        Integer ida = state.CanAttackIds.get(random.nextInt(state.CanAttackIds.size()));
+-        state.CanAttackIds.remove(ida);
+-
+-        int idt = targets.get(random.nextInt(targets.size()));
+-        sb.append(String.format("ATTACK %d %d att; ", ida, idt));
+-      }
+-
+-      // summon phase
+-      while (true)
+-      {
+-        state.HandCreaturesIds.removeIf(c -> state.IdToCostMap.get(c) > state.Mana);
+-        System.err.println(String.format("Summon phase: %d creatures can be summoned with mana limit %d.", state.HandCreaturesIds.size(), state.Mana));
+-        if (state.HandCreaturesIds.isEmpty())
+-          break;
+-
+-        Integer id = state.HandCreaturesIds.get(random.nextInt(state.HandCreaturesIds.size()));
+-        state.HandCreaturesIds.remove(id);
+-        state.Mana -= state.IdToCostMap.get(id);
+-        sb.append(String.format("SUMMON %d %d; ", id, random.nextInt(2)));
+-      }
+-
+-      // red/blue items phase
+-      while (true)
+-      {
+-        state.HandRedItemsIds.removeIf(c -> state.IdToCostMap.get(c) > state.Mana);
+-        state.HandBlueItemsIds.removeIf(c -> state.IdToCostMap.get(c) > state.Mana);
+-        System.err.println(String.format("RedBlueItems phase: %d red items and %d blue items can be used on %d creatures (+player).", state.HandRedItemsIds.size(), state.HandBlueItemsIds.size(), state.TargetCreaturesIds.size()));
+-
+-        if (state.TargetCreaturesIds.size()==0)
+-          state.HandRedItemsIds.clear();
+-
+-        if (state.HandRedItemsIds.isEmpty() && state.HandBlueItemsIds.isEmpty())
+-          break;
+-
+-        int num = random.nextInt(state.HandRedItemsIds.size() + state.HandBlueItemsIds.size());
+-        if (num < state.HandRedItemsIds.size()) // red item use
+-        {
+-          Integer id = state.HandRedItemsIds.get(num);
+-          state.HandRedItemsIds.remove(id);
+-          state.Mana -= state.IdToCostMap.get(id);
+-          int idt = state.TargetCreaturesIds.get(random.nextInt(state.TargetCreaturesIds.size()));
+-          sb.append(String.format("USE %d %d use; ", id, idt));
+-        }
+-        else // blue item use
+-        {
+-          Integer id = state.HandBlueItemsIds.get(num - state.HandRedItemsIds.size());
+-          state.HandBlueItemsIds.remove(id);
+-          state.Mana -= state.IdToCostMap.get(id);
+-          int idt = -1;
+-          if (random.nextInt(2) < 1 && state.TargetCreaturesIds.size()>0) // 50% to creature target
+-            idt = state.TargetCreaturesIds.get(random.nextInt(state.TargetCreaturesIds.size()));
+-          sb.append(String.format("USE %d %d; ", id, idt));
+-        }
+-      }
+-
+-      //if (fullbonus)
+-      System.out.println(sb.toString());
+-      //else
+-      //  System.out.println(";");
+-    }
+-  }
+-}
+\ No newline at end of file
+-- 
+2.39.2 (Apple Git-143)
+
