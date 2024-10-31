@@ -11,6 +11,9 @@ source("setup.R")
 source("model_features.R")
 
 NUM_CARDS <- 160
+RS_COUNT <- 4
+AGENTS <- c("random")
+AGENT_COUNT <- 1
 
 # =============================================================================
 #  Utils
@@ -119,6 +122,7 @@ log_change <- function(iteration, old_genotype, new_genotype, type) {
       previous_cards=I(list(old_phenotype$card)),
       cards=I(list(new_phenotype$card)),
       rs_used=new_phenotype$rs_index,
+      agent_used=new_phenotype$agent,
       type=type,
       changes_count=changes_count
     )
@@ -130,20 +134,27 @@ log_change <- function(iteration, old_genotype, new_genotype, type) {
 #  fitness function
 # =============================================================================
 
-run_tournament <- function(deck1, deck2, agent, cardlist_file) {
-  agent_bin <- NULL
+find_agent_bin <- function(agent) {
   #agent_bin <- ifelse(agent == "expert", "./Coac/main", "python3 random_agent.py")
-  #agent_bin <- "python3 random_agent.py" # 0.7s per game
-  #agent_bin <- "./Coac/main" # 1.5-2.0s per game
-  #agent_bin <- "./Chad/agent/target/debug/agent" # 10-15s per game
+  #agent_bin <- "python3 random_agent.py" # 0.7s pro Spiel
+  #agent_bin <- "./Coac/main" # 1.5-2.0s pro Spiel
+  #agent_bin <- "./Chad/agent/target/debug/agent" # 10-15s pro Spiel
+  
+  return (
+    ifelse(agent == "random", "",
+    ifelse(agent == "baseline1", "pypy3 baseline1.py",
+    ifelse(agent == "baseline2", "pypy3 baseline2.py")))
+  )
+}
+
+run_tournament <- function(deck1, deck2, agent1, agent2, cardlist_file) {
+  agent1_bin <- find_agent_bin(agent1)
+  agent2_bin <- find_agent_bin(agent2)
   
   winner <- NULL
-  if (all(deck1 == deck2)) {
-    winner <- sample(1:2, 1)
-  }
   
   while (is.null(winner)) {
-    tryCatch(winner <- run_simulation(agent_bin, agent_bin, deck1, deck2, cardlist_file, LOG_FILE), error = function(cond) {
+    tryCatch(winner <- run_simulation(agent1_bin, agent2_bin, deck1, deck2, cardlist_file, LOG_FILE), error = function(cond) {
       print(cond)
     })
   }
@@ -151,15 +162,15 @@ run_tournament <- function(deck1, deck2, agent, cardlist_file) {
   return(ifelse(winner, 1, 2))
 }
 
-run_k_random_opponents <- function(population, agent, cardlist_file, k) {
+run_k_random_opponents <- function(population, cardlist_file, k) {
   popSize <- nrow(population)
   # let each individual play the same number of games
   matchups <- create_combinations(popSize, k)
 
   winners <- parApply(clust, matchups, 1, function(matchup, population) {
-    deck1 <- genotype_to_phenotype(population[matchup[1], ])$card
-    deck2 <- genotype_to_phenotype(population[matchup[2], ])$card
-    winner <- run_tournament(deck1, deck2, agent, cardlist_file)
+    ph1 <- genotype_to_phenotype(population[matchup[1], ])
+    ph2 <- genotype_to_phenotype(population[matchup[2], ])
+    winner <- run_tournament(ph1$card, ph2$card, ph1$agent, ph2$agent, cardlist_file)
     return(matchup[winner])
   }, population = population)
   
@@ -179,14 +190,19 @@ calculate_fitness <- function(results, popSize) {
 # =============================================================================
 
 split_genotype <- function(genotype) {
-  if (length(genotype) == NUM_CARDS) {
+  if (RS_COUNT == 0) {
     rs_genotype <- NULL
   } else {
-    rs_genotype <- genotype[1:(length(genotype) - NUM_CARDS)]
+    rs_genotype <- genotype[1:RS_COUNT]
   }
-  card_genotype <- genotype[(length(genotype) - NUM_CARDS + 1):length(genotype)]
+  
+  agent_genotype <- genotype[(1+RS_COUNT):(RS_COUNT+AGENT_COUNT)]
+  
+  card_genotype <- genotype[(1+RS_COUNT+AGENT_COUNT):(RS_COUNT+AGENT_COUNT+NUM_CARDS)]
+  
   return(list(
     rs=rs_genotype,
+    agent=agent_genotype,
     card=card_genotype
   ))
 }
@@ -201,8 +217,11 @@ genotype_to_phenotype <- function(genotype) {
     rs_index <- min(which(split$rs == 1))
   }
   
+  agent_index <- min(which(split$agent == 1))
+  
   return(list(
     rs_index=rs_index,
+    agent=AGENTS[agent_index],
     cards=which(split$card %in% 1)
   ))  
 }
@@ -210,8 +229,18 @@ genotype_to_phenotype <- function(genotype) {
 assert_genotype_valid <- function(genotype, id = "") {
   split <- split_genotype(genotype)
 
+  if (length(split$rs) != RS_COUNT) {
+    stop(paste(id, "Produced invalid genotype, expected", RS_COUNT, "RS bits but found", length(split$rs), "bits"))
+  }
   if (!is.null(split$rs) && sum(split$rs) > 1) {
     stop(paste(id, "Produced invalid genotype, expected 0 or 1 1-bit for RS but found", sum(split$rs), "1-bits"))
+  }
+  
+  if (length(split$agent) != AGENT_COUNT) {
+    stop(paste(id, "Produced invalid genotype, expected", AGENT_COUNT, "Agent bits but found", length(split$agent), "bits"))
+  }
+  if (sum(split$agent) != 1) {
+    stop(paste(id, "Produced invalid genotype, expected 1 1-bit for agent but found", sum(split$agent), "1-bits"))
   }
   
   if (length(split$card) != NUM_CARDS) {
@@ -222,24 +251,33 @@ assert_genotype_valid <- function(genotype, id = "") {
   }
 }
 
-generate_random_individual <- function(rs_count, rs_index) {
+generate_random_individual <- function(rs_index, agent_index) {
   individual_cards <- sample(c(rep(0, NUM_CARDS - NUM_HAND_CARDS), rep(1, NUM_HAND_CARDS)))
 
-  if (rs_count == 0) {
+  if (RS_COUNT == 0) {
     individual_rs <- c()
   } else {
-    individual_rs <- rep(0, rs_count)
+    individual_rs <- rep(0, RS_COUNT)
     individual_rs[rs_index] <- 1
   }
-  return(c(individual_rs, individual_cards))
+  
+  individual_agent <- rep(0, AGENT_COUNT)
+  individual_agent[agent_index] <- 1
+  
+  genotype <- c(individual_rs, individual_agent, individual_cards)
+  assert_genotype_valid(genotype)
+  return(genotype)
 }
 
-generate_random_population <- function(rs_count, popSize, rs_user_fraction) {
+generate_random_population <- function(popSize, rs_user_fraction) {
+  rs_indices <- sample(rep(1:RS_COUNT, each=ceiling(popSize/RS_COUNT)))
+  agent_indices <- sample(rep(1:AGENT_COUNT, each=ceiling(popSize/AGENT_COUNT)))
+  
   individuals <- sapply(1:popSize, function(x) {
     if (x <= (1 - rs_user_fraction) * popSize) {
-      generate_random_individual(rs_count, 0)
+      generate_random_individual(0, agent_indices[x])
     } else {
-      generate_random_individual(rs_count, ((x-1) %% rs_count) + 1)
+      generate_random_individual(rs_indices[x], agent_indices[x])
     }
   })
   population <- matrix(individuals, nrow = popSize, byrow = TRUE)
@@ -280,10 +318,6 @@ count_preserving_crossover <- function(parent_genotypes, pcrossover) {
   child1_cards[card_2_to_swap] <- 1
   child2_cards[card_1_to_swap] <- 1
   child2_cards[card_2_to_swap] <- 0
-
-  # double-check the result
-  assert_genotype_valid(child1_cards)
-  assert_genotype_valid(child2_cards)
   
   changes1_count <- sum(xor(child1_cards, parents1_split$card)) / 2
   if (changes1_count > number_of_cards_to_swap) {
@@ -298,8 +332,14 @@ count_preserving_crossover <- function(parent_genotypes, pcrossover) {
   children_cards <- matrix(c(child1_cards, child2_cards), byrow=TRUE, nrow=2)
   # children get the RS by the parent with which they have most cards in common
   children_rs <- matrix(c(parents1_split$rs, parents2_split$rs), byrow=TRUE, nrow=2)
+  # children get the agent by the parent with which they have most cards in common
+  children_agent <- matrix(c(parents1_split$agent, parents2_split$agent), byrow=TRUE, nrow=2)
   
-  children_genotypes <- cbind(children_rs, children_cards)
+  children_genotypes <- cbind(children_rs, children_agent, children_cards)
+  
+  # nur zur Sicherheit, prüfe das Ergebnis:
+  assert_genotype_valid(children_genotypes[1,])
+  assert_genotype_valid(children_genotypes[2,])
   
   return(list(children = children_genotypes, fitness = rep(NA, 2)))
 }
@@ -334,8 +374,12 @@ count_preserving_mutation <- function(parent_genotype, pmutation) {
 
   # child get the RS of its parent
   child_rs <- parent_split$rs
+  # child get the agent of its parent
+  child_agent <- parent_split$agent
   
-  child_genotype <- c(child_rs, child_card)
+  child_genotype <- c(child_rs, child_agent, child_card)
+  
+  assert_genotype_valid(child_genotype)
   
   return(child_genotype)
 }
@@ -355,6 +399,8 @@ rs_mutation <- function(parent_genotype, rs_recommend, pmutation) {
   
   # child gets RS of its parent
   child_genotype_rs <- parent_genotype_split$rs
+  # child gets agent of its parent
+  child_genotype_agent <- parent_genotype_split$agent
   
   parent_phenotype <- genotype_to_phenotype(parent_genotype)
   
@@ -362,7 +408,7 @@ rs_mutation <- function(parent_genotype, rs_recommend, pmutation) {
   child_genotype_cards <- rep(0, NUM_CARDS)
   child_genotype_cards[child_cards] <- 1
   
-  child_genotype <- c(child_genotype_rs, child_genotype_cards)
+  child_genotype <- c(child_genotype_rs, child_genotype_agent, child_genotype_cards)
   assert_genotype_valid(child_genotype)
 
   changes_count <- sum(xor(child_genotype_cards, parent_genotype_split$card)) / 2
@@ -392,11 +438,16 @@ population_monitor <- function(object) {
     paste(number_of_unique_cards, ncol(object@population), sep = "/")
   ))
   
-  rs_count <- object@nBits - NUM_CARDS
-  if (rs_count > 0) {
+  if (RS_COUNT > 0) {
     used_rs <- as.vector(apply(object@population, 1, function(genotype) genotype_to_phenotype(genotype)$rs_index))
     rs_dist <- table(used_rs)
     print(rs_dist)
+  }
+  
+  if (AGENT_COUNT > 0) {
+    used_agent <- as.vector(apply(object@population, 1, function(genotype) genotype_to_phenotype(genotype)$agent))
+    agent_dist <- table(used_agent)
+    print(agent_dist)
   }
 }
 
@@ -404,11 +455,13 @@ create_log_entries <- function(results, object) {
   iteration <- rep(object@iter, object@popSize)
   cards_list <- I(as.list(as.data.frame(apply(object@population, 1, function(genotype) genotype_to_phenotype(genotype)$card))))
   rs_used <- apply(object@population, 1, function(genotype) genotype_to_phenotype(genotype)$rs_index)
+  agent_used <- apply(object@population, 1, function(genotype) genotype_to_phenotype(genotype)$agent)
 
   log <- data.frame(
     iteration = iteration,
     cards = cards_list,
     rs_used = rs_used,
+    agent_used = agent_used,
     plays = sapply(1:object@popSize, function(i) sum(results$matchups == i)),
     wins = sapply(1:object@popSize, function(i) sum(results$winners == i)),
     fitness = object@fitness
@@ -424,7 +477,7 @@ create_log_entries <- function(results, object) {
 
 # A run starts 3 processes (game + 2 agents)
 clust <- makeCluster(floor(detectCores() * 0.75), outfile = "")
-clusterExport(clust, list("run_simulation", "fromJSON", "split_genotype", "genotype_to_phenotype", "assert_genotype_valid", "run_tournament", "NUM_CARDS", "NUM_HAND_CARDS"))
+clusterExport(clust, list("run_simulation", "fromJSON", "split_genotype", "genotype_to_phenotype", "assert_genotype_valid", "run_tournament", "NUM_CARDS", "NUM_HAND_CARDS", "RS_COUNT", "AGENT_COUNT", "AGENTS", "find_agent_bin"))
 gaControl("useRcpp" = FALSE) # Mac M1 (https://github.com/luca-scr/GA/issues/52)
 
 run_ga <- function(
@@ -449,9 +502,9 @@ run_ga <- function(
   update_rs_models <- function(iteration) {
     rs_recommend_dict <<- lapply(rs_recommend_factory, function(build) build(iteration + 1))
   }
-  post_fitness <- function(object, eps=gaControl(object@type)@eps, agent, ...) {
+  post_fitness <- function(object, eps=gaControl(object@type)@eps, ...) {
     print(paste("Starting iteration", object@iter))
-    results <- run_k_random_opponents(object@population, agent, decide_cardlist_file_fn(object@iter), k)
+    results <- run_k_random_opponents(object@population, decide_cardlist_file_fn(object@iter), k)
     print("Completed k-random opponents")
     object@fitness <- calculate_fitness(results, object@popSize)
     print("Calculated fitness")
@@ -463,6 +516,16 @@ run_ga <- function(
     # wins per RS for monitoring progress
     log %>%
       group_by(rs_used) %>%
+      summarize(
+        fitness=mean(fitness),
+        plays=sum(plays),
+        wins=sum(wins)
+      ) %>%
+      print
+    
+    # wins by Agent
+    log %>%
+      group_by(agent_used) %>%
       summarize(
         fitness=mean(fitness),
         plays=sum(plays),
@@ -514,9 +577,8 @@ run_ga <- function(
     type = "binary",
     fitness = function(x, ...) 0, # implemented in postFitness because the fitness function needs access to the population
     postFitness = post_fitness,
-    agent = "random",
-    population = function(object) generate_random_population(rs_count, object@popSize, rs_user_fraction),
-    nBits = rs_count + NUM_CARDS,
+    population = function(object) generate_random_population(object@popSize, rs_user_fraction),
+    nBits = RS_COUNT + AGENT_COUNT + NUM_CARDS,
     popSize = popSize,
     maxiter = maxiter,
     selection = function(object) gabin_tourSelection(object, k=tournament_k), #gabin_nlrSelection,
@@ -546,18 +608,14 @@ rs_factory <- function(model_definition, history_length) {
 }
 
 decide_cardlist_file <- function(iteration) {
-  if (iteration < 20) {
     return("cardlist.txt")
-  } else {
-    return("logs/cardlist_balance.txt")
-  }
 }
 
-LOG_FILE <- "simulation_debug_new_1026.njson"
+LOG_FILE <- "simulation_agents_2024-10-28.njson"
 clusterExport(clust, list("LOG_FILE", "decide_cardlist_file"))
 
-k <- 10
-popSize <- 100
+k <- 20
+popSize <- 200
 
 simulation_log <- run_ga(
   pcrossover=1/NUM_HAND_CARDS*2.5,
@@ -566,15 +624,15 @@ simulation_log <- run_ga(
   rs_user_fraction=1.0, # fraction of RS users in the population
   # in each iteration, approx. k*popSize/2 games are played
   rs_recommend_factory=list(
-    aggregates=rs_factory(aggregates_model, 10000),
+    aggregates=rs_factory(aggregates_model, 8000),
     utilities=rs_factory(utilities_model, 4000),
     bagofcards=rs_factory(bagofcards_model, 20000),
-    ranking=rs_factory(ranking_model, 1000)
+    ranking=rs_factory(ranking_model, 4000)
   ),
   tournament_k=2,
   k=k, popSize=popSize,
   maxiter=50,
-  elitism=popSize/10,
+  elitism=10,
   decide_cardlist_file_fn=decide_cardlist_file
 )
 

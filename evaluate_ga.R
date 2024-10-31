@@ -47,7 +47,7 @@ join_card_stats <- function(log) {
 
 rs_colors <- scale_color_manual(values=c("None"="#F0E442", "Aggregates"="#F8766D", "Utilities"="#00BFC4", "Bag of Cards"="#7CAE00", "Ranking"="#C77CFF"))
 
-simulation_names <- c("2023-08-15" = "NEW", "2023-08-30" = "BALANCE", "2023-05-24"="NOISY")
+simulation_names <- c("2023-05-20" = "FIRST", "2023-08-15" = "NEW", "2023-08-30" = "BALANCE", "2023-05-24"="NOISY", "agents_2024-10-07"="AGENTS-BALANCE", "agents_2024-10-08"="AGENTS", "agents_2024-10-09"="AGENT-BASELINE2", "agents_2024-10-24"="AGENT-BASELINE1", "agents_2024-10-25"="AGENT-R1", "agents_2024-10-26"="AGENT-RANDOM", "agents_2024-10-27"="AGENT-R2")
 
 ###
 # Evaluation of simulation
@@ -110,7 +110,7 @@ fitness_df %>%
   ggplot(aes(x=iteration, y=mean_sim)) + geom_point() +
   labs(x="iteration", y="Jaccard similarity")
 
-ggsave(paste("./plots/simulation_", simulation_id, "_convergence.eps", sep=""), device="eps", width=8, height=6, units="cm", dpi="print")
+ggsave(paste("./plots/simulation_", simulation_id, "_convergence.eps", sep=""), device="eps", width=6, height=8, units="cm", dpi="print")
 
 for (simulation_id in simulation_ids_no_change) {
   
@@ -257,3 +257,146 @@ rbind(read_changes_log("2023-08-15"), read_changes_log("2023-08-30"), read_chang
   scale_x_continuous(breaks=c(0, 5, 10)) +
   theme(legend.position="bottom", legend.margin=margin())
 ggsave(paste("./plots/simulation_top5s.eps", sep=""), device="eps", width=6, height=10, units="cm", dpi="print")
+
+read_changes_log_with_agent <- function(simulation_id) {
+  filename <- paste("logs/simulation_", simulation_id, "_changes.csv", sep="")
+  log <- read.table(
+    filename,
+    sep=";",
+    col.names=c("unused", "iteration", "previous_cards", "cards", "rs_used", "agent_used", "type", "change_count")
+  ) %>%
+    mutate(
+      simulation_id=simulation_id,
+      rs_used=factor(rs_used, levels=0:4, labels=c("None", "Aggregates", "Utilities", "Bag of Cards", "Ranking")),
+      agent_used=factor(agent_used),
+      type=factor(type, labels=c("crossover", "mutation", "RS-mutation")),
+      deck=lapply(cards, function(d) eval(parse(text=d))),
+      previous_deck=lapply(previous_cards, function(d) eval(parse(text=d)))
+    )
+  return(log)
+}
+
+
+buffed_cards <- c(57, 140, 110, 108, 7, 127)
+nerfed_cards <- c(18, 123, 124, 69, 83, 21)
+
+changes_df %>%
+  filter(type=="RS-mutation") %>%
+  filter(iteration <= 25) %>%
+  mutate(
+    cards_added=mapply(function(new, old) setdiff(new, old), deck, previous_deck),
+    changed_cards_added=sapply(cards_added, function(c) sum(c %in% buffed_cards))
+  ) %>%
+  group_by(iteration, rs_used) %>%
+  summarise(changed_cards_added=mean(changed_cards_added), .groups="keep") %>%
+  ggplot(aes(x=iteration, y=changed_cards_added, color=rs_used)) + geom_point() +
+  labs(x="iteration", y="avg. no. of buffed cards recommended", color="RS", caption=recode(simulation_id, !!!simulation_names)) +
+  geom_vline(xintercept=change_iter-0.5) +
+  facet_grid(rs_used ~ .) +
+  theme(legend.position="none", plot.caption = element_text(hjust=0.5, size=rel(1.2))) +
+  rs_colors
+
+ggsave(paste("./plots/simulation_", simulation_id, "_changed_cards.eps", sep=""), device="eps", width=12, height=10, units="cm", dpi="print")
+
+
+###
+# plots for ToG
+
+
+# popularity of b/g/w ability over time in run FIRST
+simulation_id <- "2023-05-20"
+fitness_df <- read_fitness_log(simulation_id)
+stats <- join_card_stats(fitness_df)
+stats %>%
+  group_by(iteration) %>%
+  summarise(across(
+    c("ability_g", "ability_w", "ability_b"), function(stat) sum(stat)
+  )) %>%
+  pivot_longer(!iteration, names_to="statistic", values_to="sum") %>%
+  mutate(statistic_f=factor(statistic, levels=c("ability_b", "ability_g", "ability_w"), labels=c("Breakthrough", "Guard", "Ward"))) %>%
+  ggplot(aes(x=iteration, y=sum, color=statistic_f)) + geom_point() + facet_grid(statistic %in% c("ability_g", "ability_w") ~ ., scales = "free_y") +
+  labs(x="iteration", y="cards", color="ability") +
+  theme(legend.position="bottom", legend.margin=margin(t = -5), plot.title = element_text(hjust = 0.5), plot.caption = element_text(hjust=0.5, size=rel(1.2)), strip.text=element_blank())
+
+ggsave(paste("../../tog-24/plots/simulation_", simulation_id, "_abilities.eps", sep=""), device="eps", width=12, height=8, units="cm", dpi="print")
+
+# jaccard similarity in run FIRST
+fitness_df %>%
+  left_join(fitness_df, by=c("iteration"), suffix=c(".a", ".b"), relationship="many-to-many") %>%
+  mutate(jaccard_sim=mapply(jaccard_similarity, deck.a, deck.b)) %>%
+  group_by(iteration) %>%
+  summarise(mean_sim=mean(jaccard_sim)) %>%
+  ggplot(aes(x=iteration, y=mean_sim)) + geom_point() +
+  labs(x="iteration", y="Jaccard similarity")
+
+ggsave(paste("../../tog-24/plots/simulation_", simulation_id, "_convergence.eps", sep=""), device="eps", width=6, height=8, units="cm", dpi="print")
+
+# individuals by RS and agent in run AGENTS
+simulation_id <- "agents_2024-10-08"
+fitness_df <- read_fitness_log(simulation_id)
+fitness_df %>%
+  filter(iteration <= 20) %>%
+  group_by(iteration, rs_used, agent_used) %>%
+  summarise(individuals=n(), .groups="keep") %>%
+  ggplot(aes(x=iteration, y=individuals, fill=agent_used)) + geom_bar(stat="identity", position="stack") +
+  labs(x="iteration", y="individuals", fill="agent", color="RS", caption=recode(simulation_id, !!!simulation_names)) +
+  facet_grid(rs_used ~ .) +
+  theme(legend.position="right", legend.margin=margin(t = -5), plot.title = element_text(hjust = 0.5), plot.caption = element_text(hjust=0.5, size=rel(1.2)))
+
+ggsave(paste("../../tog-24/plots/simulation_", simulation_id, "_individuals.eps", sep=""), device="eps", width=11, height=12, units="cm", dpi="print")
+
+# individuals by RS in run AGENT-BL2
+simulation_id <- "agents_2024-10-09"
+fitness_df <- read_fitness_log(simulation_id)
+fitness_df %>%
+  filter(iteration <= 50) %>%
+  group_by(iteration, rs_used) %>%
+  summarise(individuals=n(), .groups="keep") %>%
+  ggplot(aes(x=iteration, y=individuals, color=rs_used)) + geom_bar(stat="identity") +
+  labs(x="iteration", y="individuals", fill="agent", color="RS", caption=recode(simulation_id, !!!simulation_names)) +
+  facet_grid(rs_used ~ .) +
+  theme(legend.position="none", plot.title = element_text(hjust = 0.5), plot.caption = element_text(hjust=0.5, size=rel(1.2))) +
+  rs_colors
+
+ggsave(paste("../../tog-24/plots/simulation_", simulation_id, "_users.eps", sep=""), device="eps", width=8, height=12, units="cm", dpi="print")
+
+# table with mean/sd of aggregate RS model's coefficients in the first 10 iterations for each run
+coeff_means_iter <- 10
+coeff_means <- lapply(c("simulation_agents_2024-10-09.njson", "simulation_agents_2024-10-24.njson", "simulation_agents_2024-10-25.njson", "simulation_agents_2024-10-26.njson", "simulation_agents_2024-10-27.njson"), function(logfile) {
+  model_definition <- aggregates_model
+  feature_fn_applied <- model_definition$feature_fn(read_cardlist("cardlist.txt"))
+  train_log <- read_log_matches(logfile)
+  train_log_piece <- train_log[1:(coeff_means_iter*4000), ]
+  train_data <- prepare_log(train_log_piece, feature_fn_applied)
+  
+  models_by_iteration <- lapply(1:coeff_means_iter, function(i) {
+    end_index <- i * length(train_data$target) / coeff_means_iter
+    start_index <- max(1, end_index - 4000)
+    train_chunk <- list(target=train_data$target[start_index:end_index], features=train_data$features[start_index:end_index,])
+    m <- model_definition$model_fn(train_chunk)
+    return (m)
+  })
+  
+  attack_values <- sapply(models_by_iteration, function(m) m$coefficients["creature_attack_mean"])
+  attack_mean <- mean(attack_values)
+  attack_sd <- sd(attack_values)
+  
+  defense_values <- sapply(models_by_iteration, function(m) m$coefficients["creature_defense_mean"])
+  defense_mean <- mean(defense_values)
+  defense_sd <- sd(defense_values)
+  
+  ability_g_values <- sapply(models_by_iteration, function(m) m$coefficients["ability_g_count"])
+  ability_g_mean <- mean(ability_g_values)
+  ability_g_sd <- sd(ability_g_values)
+  
+  return (c(
+    id=logfile,
+    attack_mean=attack_mean,
+    attack_sd=attack_sd,
+    defense_mean=defense_mean,
+    defense_sd=defense_sd,
+    ability_g_mean=ability_g_mean,
+    ability_g_sd=ability_g_sd
+  ))
+})
+coeff_means
