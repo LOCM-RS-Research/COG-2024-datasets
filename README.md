@@ -1,5 +1,5 @@
 # Adaptivity of Card Recommendation Systems in Legends of Code and Magic
-Code and datasets for our paper "Adaptivity of Card Recommendation Systems in Legends of Code and Magic"
+Code and datasets for our papers titled "Adaptivity of Card Recommendation Systems in Legends of Code and Magic"
 
 ### LOCM
 See https://github.com/acatai/Strategy-Card-Game-AI-Competition

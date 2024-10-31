@@ -71,10 +71,10 @@ run_simulation <- function(agent1, agent2, deck1, deck2, cardlist_file, log_file
   )
   runner_args <- paste("play", "-l", log_file)
   runner_args <- paste(runner_args, "-d", shQuote(runner_config_params))
-  if (!is.null(agent1)) {
+  if (agent1 != "") {
     runner_args <- paste(runner_args, "-p1", shQuote(agent1))
   }
-  if (!is.null(agent2)) {
+  if (agent2 != "") {
     runner_args <- paste(runner_args, "-p2", shQuote(agent2))
   }
   locm_jar <- "./LegendsOfCodeAndMagic-1.2.jar"
