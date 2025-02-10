@@ -1,1 +1,0 @@
-Dieser Ordner enthält Test- und Trainingsdatensätze und die Logs der Simulationen.
